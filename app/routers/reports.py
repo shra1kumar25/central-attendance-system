@@ -3,6 +3,8 @@ import calendar
 from datetime import date, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from app.services.email_service import send_attendance_report
+
 from sqlalchemy.orm import Session
 
 from app.db.session import get_db
@@ -243,4 +245,56 @@ def unified_attendance_report(
         "period_end": period_end.isoformat(),
         "total_employees": len(report_employees),
         "employees": report_employees,
+    }
+
+@router.post("/attendance/email")
+def email_attendance_report(
+    employee_id: int = Query(..., gt=0),
+    period: str = Query(
+        ...,
+        description="daily, weekly, monthly, yearly, or custom",
+    ),
+    report_date: date | None = None,
+    start_date: date | None = None,
+    end_date: date | None = None,
+    db: Session = Depends(get_db),
+):
+    # Generate the report for this employee.
+    report = unified_attendance_report(
+        period=period,
+        report_date=report_date,
+        start_date=start_date,
+        end_date=end_date,
+        employee_id=employee_id,
+        db=db,
+    )
+
+    employee_report = report["employees"][0]
+
+    # Send the report to the employee's registered email address.
+    try:
+        sent = send_attendance_report(
+            employee_name=employee_report["employee_name"],
+            employee_email=employee_report["email"],
+            report=report,
+        )
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail="Failed to send attendance report email",
+        ) from None
+
+    if not sent:
+        raise HTTPException(
+            status_code=502,
+            detail="Attendance report email was not sent",
+        )
+
+    return {
+        "message": "Attendance report emailed successfully",
+        "employee_id": employee_report["employee_id"],
+        "employee_name": employee_report["employee_name"],
+        "recipient": employee_report["email"],
+        "period_start": employee_report["period_start"],
+        "period_end": employee_report["period_end"],
     }
