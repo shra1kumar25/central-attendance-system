@@ -170,3 +170,101 @@ def test_email_report_employee_not_found(
 
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+
+def test_email_report_invalid_employee_id(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/reports/attendance/email",
+            params={
+                "employee_id": "abc",
+                "period": "weekly",
+                "report_date": "2026-10-10",
+            },
+        )
+        assert response.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_email_report_invalid_period(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/reports/attendance/email",
+            params={
+                "employee_id": 1,
+                "period": "quarterly",
+                "report_date": "2026-10-10",
+            },
+        )
+        assert response.status_code == 400
+        assert "period must be" in response.json()["detail"]
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_email_report_custom_period_missing_dates(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/reports/attendance/email",
+            params={
+                "employee_id": 1,
+                "period": "custom",
+            },
+        )
+        assert response.status_code == 400
+        assert "start_date and end_date are required" in (
+            response.json()["detail"]
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_email_report_email_service_failure(test_db, monkeypatch):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    def failing_email_service(**kwargs):
+        raise RuntimeError("Simulated email failure")
+
+    monkeypatch.setattr(
+        "app.routers.reports.send_attendance_report",
+        failing_email_service,
+    )
+
+    try:
+        client = TestClient(app)
+        response = client.post(
+            "/reports/attendance/email",
+            params={
+                "employee_id": 1,
+                "period": "weekly",
+                "report_date": "2026-10-10",
+            },
+        )
+        assert response.status_code == 502
+        assert response.json()["detail"] == (
+            "Failed to send attendance report email"
+        )
+    finally:
+        app.dependency_overrides.pop(get_db, None)
