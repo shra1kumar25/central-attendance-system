@@ -1,6 +1,5 @@
-
 import os
-from datetime import date, datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
@@ -10,8 +9,8 @@ from app.db.session import get_db
 from app.models import (
     Attendance,
     Department,
-    Employee,
     EmailNotification,
+    Employee,
 )
 from app.schemas.attendance import (
     AttendanceCreate,
@@ -24,13 +23,13 @@ from app.schemas.attendance import (
 from app.services.email_service import send_policy_warning
 from app.services.policy import calculate_weekly_compliance
 
-
 router = APIRouter()
 
 
 # --------------------------------------------------
 # DEPARTMENT APIs
 # --------------------------------------------------
+
 
 @router.post(
     "/departments",
@@ -42,9 +41,7 @@ def create_department(
     db: Session = Depends(get_db),
 ):
     existing = (
-        db.query(Department)
-        .filter(Department.name == department_data.name)
-        .first()
+        db.query(Department).filter(Department.name == department_data.name).first()
     )
 
     if existing:
@@ -72,6 +69,7 @@ def list_departments(db: Session = Depends(get_db)):
 # --------------------------------------------------
 # EMPLOYEE APIs
 # --------------------------------------------------
+
 
 @router.post(
     "/employees",
@@ -129,6 +127,7 @@ def list_employees(db: Session = Depends(get_db)):
 # ATTENDANCE CREATION AND LISTING
 # --------------------------------------------------
 
+
 @router.post(
     "/attendance",
     response_model=AttendanceResponse,
@@ -139,9 +138,7 @@ def create_attendance(
     db: Session = Depends(get_db),
 ):
     employee = (
-        db.query(Employee)
-        .filter(Employee.id == attendance_data.employee_id)
-        .first()
+        db.query(Employee).filter(Employee.id == attendance_data.employee_id).first()
     )
 
     if not employee:
@@ -225,9 +222,7 @@ def list_attendance(
         query = query.filter(Attendance.employee_id == employee_id)
 
     if attendance_date is not None:
-        query = query.filter(
-            Attendance.attendance_date == attendance_date
-        )
+        query = query.filter(Attendance.attendance_date == attendance_date)
 
     if status_filter is not None:
         query = query.filter(Attendance.status == status_filter)
@@ -246,6 +241,7 @@ def list_attendance(
 # --------------------------------------------------
 # EMPLOYEE CHECK-IN
 # --------------------------------------------------
+
 
 @router.post(
     "/attendance/{employee_id}/check-in",
@@ -293,7 +289,7 @@ def check_in(
             detail="Employee has already checked in today",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if attendance is None:
         attendance = Attendance(
@@ -307,10 +303,7 @@ def check_in(
         if attendance.status in {"ABSENT", "LEAVE"}:
             raise HTTPException(
                 status_code=400,
-                detail=(
-                    "Cannot check in when attendance is marked absent "
-                    "or on leave"
-                ),
+                detail=("Cannot check in when attendance is marked absent or on leave"),
             )
 
         attendance.check_in = now
@@ -325,6 +318,7 @@ def check_in(
 # --------------------------------------------------
 # EMPLOYEE CHECK-OUT
 # --------------------------------------------------
+
 
 @router.post(
     "/attendance/{employee_id}/check-out",
@@ -378,7 +372,7 @@ def check_out(
             detail="Employee has already checked out today",
         )
 
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
 
     if now < attendance.check_in:
         raise HTTPException(
@@ -397,6 +391,7 @@ def check_out(
 # INDIVIDUAL EMPLOYEE ATTENDANCE SUMMARY
 # --------------------------------------------------
 
+
 @router.get("/attendance/summary")
 def attendance_summary(
     employee_id: int,
@@ -408,11 +403,7 @@ def attendance_summary(
             detail="Employee ID must be greater than zero",
         )
 
-    employee = (
-        db.query(Employee)
-        .filter(Employee.id == employee_id)
-        .first()
-    )
+    employee = db.query(Employee).filter(Employee.id == employee_id).first()
 
     if not employee:
         raise HTTPException(
@@ -420,32 +411,23 @@ def attendance_summary(
             detail="Employee not found",
         )
 
-    records = (
-        db.query(Attendance)
-        .filter(Attendance.employee_id == employee_id)
-        .all()
-    )
+    records = db.query(Attendance).filter(Attendance.employee_id == employee_id).all()
 
     return {
         "employee_id": employee.id,
         "employee_code": employee.employee_code,
         "employee_name": employee.full_name,
         "total_recorded_days": len(records),
-        "present_days": sum(
-            1 for record in records if record.status == "PRESENT"
-        ),
-        "absent_days": sum(
-            1 for record in records if record.status == "ABSENT"
-        ),
-        "leave_days": sum(
-            1 for record in records if record.status == "LEAVE"
-        ),
+        "present_days": sum(1 for record in records if record.status == "PRESENT"),
+        "absent_days": sum(1 for record in records if record.status == "ABSENT"),
+        "leave_days": sum(1 for record in records if record.status == "LEAVE"),
     }
 
 
 # --------------------------------------------------
 # DATE-RANGE ATTENDANCE REPORT
 # --------------------------------------------------
+
 
 @router.get("/attendance/report")
 def attendance_report(
@@ -467,11 +449,7 @@ def attendance_report(
         )
 
     if employee_id is not None:
-        employee = (
-            db.query(Employee)
-            .filter(Employee.id == employee_id)
-            .first()
-        )
+        employee = db.query(Employee).filter(Employee.id == employee_id).first()
         if not employee:
             raise HTTPException(
                 status_code=404,
@@ -486,28 +464,19 @@ def attendance_report(
     if employee_id is not None:
         query = query.filter(Attendance.employee_id == employee_id)
 
-    records = (
-        query.order_by(
-            Attendance.attendance_date,
-            Attendance.employee_id,
-        )
-        .all()
-    )
+    records = query.order_by(
+        Attendance.attendance_date,
+        Attendance.employee_id,
+    ).all()
 
     return {
         "start_date": start_date,
         "end_date": end_date,
         "employee_id": employee_id,
         "total_recorded_days": len(records),
-        "present_days": sum(
-            1 for record in records if record.status == "PRESENT"
-        ),
-        "absent_days": sum(
-            1 for record in records if record.status == "ABSENT"
-        ),
-        "leave_days": sum(
-            1 for record in records if record.status == "LEAVE"
-        ),
+        "present_days": sum(1 for record in records if record.status == "PRESENT"),
+        "absent_days": sum(1 for record in records if record.status == "ABSENT"),
+        "leave_days": sum(1 for record in records if record.status == "LEAVE"),
         "records": [
             {
                 "attendance_id": record.id,
@@ -526,15 +495,14 @@ def attendance_report(
 # WEEKLY COMPLIANCE REPORT FOR ALL ACTIVE EMPLOYEES
 # --------------------------------------------------
 
+
 @router.get("/attendance/weekly-compliance")
 def weekly_compliance(
     week_start: date | None = None,
     db: Session = Depends(get_db),
 ):
     today = date.today()
-    start_date = week_start or (
-        today - timedelta(days=today.weekday())
-    )
+    start_date = week_start or (today - timedelta(days=today.weekday()))
     end_date = start_date + timedelta(days=6)
 
     employees = (
@@ -563,13 +531,15 @@ def weekly_compliance(
             period_end=end_date,
         )
 
-        results.append({
-            "employee_id": employee.id,
-            "employee_code": employee.employee_code,
-            "employee_name": employee.full_name,
-            "email": employee.email,
-            **compliance,
-        })
+        results.append(
+            {
+                "employee_id": employee.id,
+                "employee_code": employee.employee_code,
+                "employee_name": employee.full_name,
+                "email": employee.email,
+                **compliance,
+            }
+        )
 
     return {
         "report_type": "weekly_compliance",
@@ -577,16 +547,13 @@ def weekly_compliance(
         "week_end": end_date.isoformat(),
         "total_employees": len(results),
         "compliant_employees": sum(
-            1 for item in results
-            if item["policy_status"] == "COMPLIANT"
+            1 for item in results if item["policy_status"] == "COMPLIANT"
         ),
         "non_compliant_employees": sum(
-            1 for item in results
-            if item["policy_status"] == "NON_COMPLIANT"
+            1 for item in results if item["policy_status"] == "NON_COMPLIANT"
         ),
         "pending_employees": sum(
-            1 for item in results
-            if item["policy_status"] == "PENDING"
+            1 for item in results if item["policy_status"] == "PENDING"
         ),
         "employees": results,
     }
@@ -596,15 +563,14 @@ def weekly_compliance(
 # WEEKLY POLICY NOTIFICATIONS WITH HISTORY
 # --------------------------------------------------
 
+
 @router.post("/attendance/weekly-policy-notifications")
 def send_weekly_policy_notifications(
     week_start: date | None = None,
     db: Session = Depends(get_db),
 ):
     today = date.today()
-    start_date = week_start or (
-        today - timedelta(days=today.weekday())
-    )
+    start_date = week_start or (today - timedelta(days=today.weekday()))
     end_date = start_date + timedelta(days=6)
 
     if end_date >= today:
@@ -643,13 +609,15 @@ def send_weekly_policy_notifications(
         )
 
         if compliance["policy_status"] != "NON_COMPLIANT":
-            results.append({
-                "employee_id": employee.id,
-                "employee_name": employee.full_name,
-                "policy_status": compliance["policy_status"],
-                "notification": "SKIPPED",
-                "reason": "Employee is not non-compliant",
-            })
+            results.append(
+                {
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "policy_status": compliance["policy_status"],
+                    "notification": "SKIPPED",
+                    "reason": "Employee is not non-compliant",
+                }
+            )
             continue
 
         notification = (
@@ -663,13 +631,15 @@ def send_weekly_policy_notifications(
         )
 
         if notification and notification.status in {"PREVIEWED", "SENT"}:
-            results.append({
-                "employee_id": employee.id,
-                "employee_name": employee.full_name,
-                "policy_status": compliance["policy_status"],
-                "notification": "SKIPPED_DUPLICATE",
-                "reason": "A notification is already recorded for this week",
-            })
+            results.append(
+                {
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "policy_status": compliance["policy_status"],
+                    "notification": "SKIPPED_DUPLICATE",
+                    "reason": "A notification is already recorded for this week",
+                }
+            )
             continue
 
         if notification is None:
@@ -686,13 +656,15 @@ def send_weekly_policy_notifications(
                 db.refresh(notification)
             except IntegrityError:
                 db.rollback()
-                results.append({
-                    "employee_id": employee.id,
-                    "employee_name": employee.full_name,
-                    "policy_status": compliance["policy_status"],
-                    "notification": "SKIPPED_DUPLICATE",
-                    "reason": "A notification record already exists",
-                })
+                results.append(
+                    {
+                        "employee_id": employee.id,
+                        "employee_name": employee.full_name,
+                        "policy_status": compliance["policy_status"],
+                        "notification": "SKIPPED_DUPLICATE",
+                        "reason": "A notification record already exists",
+                    }
+                )
                 continue
         else:
             notification.status = "PENDING"
@@ -712,21 +684,23 @@ def send_weekly_policy_notifications(
 
             if email_mode == "smtp":
                 notification.status = "SENT"
-                notification.sent_at = datetime.now(timezone.utc)
+                notification.sent_at = datetime.now(UTC)
             else:
                 notification.status = "PREVIEWED"
                 notification.sent_at = None
 
             db.commit()
 
-            results.append({
-                "employee_id": employee.id,
-                "employee_name": employee.full_name,
-                "policy_status": compliance["policy_status"],
-                "notification": notification.status,
-            })
+            results.append(
+                {
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "policy_status": compliance["policy_status"],
+                    "notification": notification.status,
+                }
+            )
 
-        except Exception:
+        except Exception:  # noqa: BLE001 — rollback and record notification failure
             db.rollback()
 
             saved_notification = (
@@ -743,13 +717,15 @@ def send_weekly_policy_notifications(
                 saved_notification.status = "FAILED"
                 db.commit()
 
-            results.append({
-                "employee_id": employee.id,
-                "employee_name": employee.full_name,
-                "policy_status": compliance["policy_status"],
-                "notification": "FAILED",
-                "reason": "Notification preview failed",
-            })
+            results.append(
+                {
+                    "employee_id": employee.id,
+                    "employee_name": employee.full_name,
+                    "policy_status": compliance["policy_status"],
+                    "notification": "FAILED",
+                    "reason": "Notification preview failed",
+                }
+            )
 
     return {
         "report_type": "weekly_policy_notifications",
@@ -757,16 +733,15 @@ def send_weekly_policy_notifications(
         "week_end": end_date.isoformat(),
         "total_employees": len(results),
         "notifications_previewed": sum(
-            1 for item in results
-            if item["notification"] == "PREVIEWED"
+            1 for item in results if item["notification"] == "PREVIEWED"
         ),
         "notifications_skipped": sum(
-            1 for item in results
+            1
+            for item in results
             if item["notification"] in {"SKIPPED", "SKIPPED_DUPLICATE"}
         ),
         "notifications_failed": sum(
-            1 for item in results
-            if item["notification"] == "FAILED"
+            1 for item in results if item["notification"] == "FAILED"
         ),
         "employees": results,
     }

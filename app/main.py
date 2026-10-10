@@ -1,14 +1,13 @@
-
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
 from app.db.session import Base, engine
-from app.models import (
+from app.models import (  # noqa: F401
     Attendance,
     Department,
-    Employee,
     EmailNotification,
+    Employee,
 )
 from app.routers.attendance import router as attendance_router
 from app.routers.reports import router as reports_router
@@ -29,6 +28,7 @@ app = FastAPI(
 
 app.include_router(attendance_router)
 app.include_router(reports_router)
+
 
 @app.get("/")
 def home():

@@ -80,6 +80,7 @@ HR / Attendance Management System
 
     raise RuntimeError(f"Unsupported EMAIL_MODE: {EMAIL_MODE}")
 
+
 def send_attendance_report(
     employee_name: str,
     employee_email: str,
@@ -112,17 +113,17 @@ def send_attendance_report(
 
 Here is your attendance report.
 
-Employee ID: {employee_report['employee_id']}
-Employee Code: {employee_report['employee_code']}
-Report Type: {report['report_type']}
-Period: {employee_report['period_start']} to {employee_report['period_end']}
+Employee ID: {employee_report["employee_id"]}
+Employee Code: {employee_report["employee_code"]}
+Report Type: {report["report_type"]}
+Period: {employee_report["period_start"]} to {employee_report["period_end"]}
 
 ATTENDANCE SUMMARY
 ------------------
-Office days attended: {employee_report['days_attended']}
-Total hours worked: {employee_report['total_hours']}
-Average hours per attended day: {employee_report['average_hours_per_day']}
-Policy status: {employee_report['policy_status']}
+Office days attended: {employee_report["days_attended"]}
+Total hours worked: {employee_report["total_hours"]}
+Average hours per attended day: {employee_report["average_hours_per_day"]}
+Policy status: {employee_report["policy_status"]}
 
 DAILY ATTENDANCE DETAILS
 -----------------------
@@ -161,9 +162,7 @@ HR / Attendance Management System
         message["To"] = employee_email
         message.set_content(body)
 
-        with smtplib.SMTP(
-            smtp_host, smtp_port, timeout=20
-        ) as server:
+        with smtplib.SMTP(smtp_host, smtp_port, timeout=20) as server:
             server.starttls()
             server.login(smtp_username, smtp_password)
             server.send_message(message)

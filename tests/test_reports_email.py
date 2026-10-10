@@ -1,4 +1,3 @@
-
 from datetime import date, datetime
 
 import pytest
@@ -111,13 +110,9 @@ def test_email_attendance_report(
         assert response.status_code == 200
 
         body = response.json()
-        assert body["message"] == (
-            "Attendance report emailed successfully"
-        )
+        assert body["message"] == ("Attendance report emailed successfully")
         assert body["employee_id"] == 1
-        assert body["recipient"] == (
-            "attendance-test@example.com"
-        )
+        assert body["recipient"] == ("attendance-test@example.com")
         assert body["period_start"] == "2026-10-05"
         assert body["period_end"] == "2026-10-11"
 
@@ -125,9 +120,7 @@ def test_email_attendance_report(
 
         email = email_calls[0]
         assert email["employee_name"] == "Test Employee"
-        assert email["employee_email"] == (
-            "attendance-test@example.com"
-        )
+        assert email["employee_email"] == ("attendance-test@example.com")
 
         report_employee = email["report"]["employees"][0]
         assert report_employee["days_attended"] == 1
@@ -135,6 +128,7 @@ def test_email_attendance_report(
 
     finally:
         app.dependency_overrides.pop(get_db, None)
+
 
 def test_email_report_employee_not_found(
     test_db,
@@ -231,9 +225,7 @@ def test_email_report_custom_period_missing_dates(test_db):
             },
         )
         assert response.status_code == 400
-        assert "start_date and end_date are required" in (
-            response.json()["detail"]
-        )
+        assert "start_date and end_date are required" in (response.json()["detail"])
     finally:
         app.dependency_overrides.pop(get_db, None)
 
@@ -263,11 +255,10 @@ def test_email_report_email_service_failure(test_db, monkeypatch):
             },
         )
         assert response.status_code == 502
-        assert response.json()["detail"] == (
-            "Failed to send attendance report email"
-        )
+        assert response.json()["detail"] == ("Failed to send attendance report email")
     finally:
         app.dependency_overrides.pop(get_db, None)
+
 
 def test_daily_report_calculates_working_hours(test_db):
     def override_get_db():

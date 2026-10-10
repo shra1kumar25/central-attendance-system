@@ -1,14 +1,13 @@
-
 from app.models.attendance import (
     Attendance,
     Department,
-    Employee,
     EmailNotification,
+    Employee,
 )
 
 __all__ = [
     "Attendance",
     "Department",
-    "Employee",
     "EmailNotification",
+    "Employee",
 ]
