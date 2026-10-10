@@ -268,3 +268,122 @@ def test_email_report_email_service_failure(test_db, monkeypatch):
         )
     finally:
         app.dependency_overrides.pop(get_db, None)
+
+def test_daily_report_calculates_working_hours(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/reports/attendance",
+            params={
+                "period": "daily",
+                "report_date": "2026-10-10",
+                "employee_id": 1,
+            },
+        )
+
+        assert response.status_code == 200
+
+        employee = response.json()["employees"][0]
+        assert employee["days_attended"] == 1
+        assert employee["total_hours"] == 8.0
+        assert employee["average_hours_per_day"] == 8.0
+        assert employee["daily_records"][0]["hours_worked"] == 8.0
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_weekly_report_calculates_working_hours(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/reports/attendance",
+            params={
+                "period": "weekly",
+                "report_date": "2026-10-10",
+                "employee_id": 1,
+            },
+        )
+
+        assert response.status_code == 200
+
+        employee = response.json()["employees"][0]
+        assert employee["period_start"] == "2026-10-05"
+        assert employee["period_end"] == "2026-10-11"
+        assert employee["days_attended"] == 1
+        assert employee["total_hours"] == 8.0
+        assert employee["average_hours_per_day"] == 8.0
+        assert len(employee["daily_records"]) == 7
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_missing_attendance_day_has_zero_hours(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        client = TestClient(app)
+        response = client.get(
+            "/reports/attendance",
+            params={
+                "period": "daily",
+                "report_date": "2026-10-11",
+                "employee_id": 1,
+            },
+        )
+
+        assert response.status_code == 200
+
+        employee = response.json()["employees"][0]
+        assert employee["days_attended"] == 0
+        assert employee["total_hours"] == 0.0
+        assert employee["average_hours_per_day"] == 0.0
+
+        daily_record = employee["daily_records"][0]
+        assert daily_record["hours_worked"] == 0.0
+        assert daily_record["attendance_status"] == "NOT_ATTENDED"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
+
+
+def test_checkout_before_checkin_does_not_add_hours(test_db):
+    def override_get_db():
+        yield test_db
+
+    app.dependency_overrides[get_db] = override_get_db
+
+    try:
+        record = test_db.query(Attendance).first()
+        record.check_out = datetime(2026, 10, 10, 8, 0)
+        test_db.commit()
+
+        client = TestClient(app)
+        response = client.get(
+            "/reports/attendance",
+            params={
+                "period": "daily",
+                "report_date": "2026-10-10",
+                "employee_id": 1,
+            },
+        )
+
+        assert response.status_code == 200
+
+        employee = response.json()["employees"][0]
+        assert employee["days_attended"] == 0
+        assert employee["total_hours"] == 0.0
+        assert employee["daily_records"][0]["hours_worked"] == 0.0
+    finally:
+        app.dependency_overrides.pop(get_db, None)
