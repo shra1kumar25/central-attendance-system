@@ -3,7 +3,6 @@ from datetime import date
 
 from app.models import Attendance
 
-
 MINIMUM_DAYS_PER_WEEK = 3
 MINIMUM_HOURS_PER_WEEK = 15
 MINIMUM_AVERAGE_HOURS_PER_DAY = 5
