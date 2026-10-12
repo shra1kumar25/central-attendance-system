@@ -72,6 +72,48 @@ jobs:
       - name: Build frontend
         run: npm run build
 
+
+  deploy-local:
+    name: Deploy to Local Docker
+    runs-on: [self-hosted, Linux, X64]
+    needs: [backend, frontend, publish-api]
+
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+
+    permissions:
+      contents: read
+      packages: read
+
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull and update API container
+        working-directory: /home/hi/central-attendance-system
+        run: |
+          docker compose pull api
+          docker compose up -d --no-build --no-deps api
+
+      - name: Verify API health
+        run: |
+          for i in {1..12}; do
+            if curl --fail --silent http://localhost:8000/health; then
+              echo
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "API health check failed"
+          exit 1
+
+      - name: Log out from GHCR
+        if: always()
+        run: docker logout ghcr.io
+
   publish-api:
     name: Build and Publish API Image
     runs-on: ubuntu-latest

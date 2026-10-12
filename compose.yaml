@@ -17,6 +17,7 @@ services:
     restart: unless-stopped
 
   api:
+    image: ghcr.io/shra1kumar25/central-attendance-system-api:latest
     build: .
     env_file:
       - .env
