@@ -1,4 +1,3 @@
-
 from datetime import date
 
 from app.models import Attendance
@@ -39,15 +38,11 @@ def calculate_weekly_compliance(
         # Incomplete sessions do not count toward
         # completed attendance days or working hours.
         if record.check_in is None or record.check_out is None:
-            incomplete_dates.append(
-                record.attendance_date.isoformat()
-            )
+            incomplete_dates.append(record.attendance_date.isoformat())
             continue
 
         # Calculate the duration without rounding.
-        duration_seconds = (
-            record.check_out - record.check_in
-        ).total_seconds()
+        duration_seconds = (record.check_out - record.check_in).total_seconds()
 
         # Ignore zero-duration or invalid sessions.
         if duration_seconds <= 0:
@@ -59,30 +54,17 @@ def calculate_weekly_compliance(
     days_attended = len(attended_dates)
 
     # Calculate the average using unrounded total hours.
-    average_hours_per_day = (
-        total_hours / days_attended
-        if days_attended > 0
-        else 0.0
-    )
+    average_hours_per_day = total_hours / days_attended if days_attended > 0 else 0.0
 
     # Evaluate policy requirements before rounding.
-    days_requirement_met = (
-        days_attended >= MINIMUM_DAYS_PER_WEEK
-    )
+    days_requirement_met = days_attended >= MINIMUM_DAYS_PER_WEEK
 
-    hours_requirement_met = (
-        total_hours >= MINIMUM_HOURS_PER_WEEK
-    )
+    hours_requirement_met = total_hours >= MINIMUM_HOURS_PER_WEEK
 
-    average_requirement_met = (
-        average_hours_per_day
-        >= MINIMUM_AVERAGE_HOURS_PER_DAY
-    )
+    average_requirement_met = average_hours_per_day >= MINIMUM_AVERAGE_HOURS_PER_DAY
 
     compliant = (
-        days_requirement_met
-        and hours_requirement_met
-        and average_requirement_met
+        days_requirement_met and hours_requirement_met and average_requirement_met
     )
 
     # Do not declare a violation while the reporting
@@ -99,14 +81,10 @@ def calculate_weekly_compliance(
         "period_end": period_end.isoformat(),
         "days_attended": days_attended,
         "total_hours": round(total_hours, 2),
-        "average_hours_per_day": round(
-            average_hours_per_day, 2
-        ),
+        "average_hours_per_day": round(average_hours_per_day, 2),
         "minimum_days_required": MINIMUM_DAYS_PER_WEEK,
         "minimum_hours_required": MINIMUM_HOURS_PER_WEEK,
-        "minimum_average_hours_per_day": (
-            MINIMUM_AVERAGE_HOURS_PER_DAY
-        ),
+        "minimum_average_hours_per_day": (MINIMUM_AVERAGE_HOURS_PER_DAY),
         "days_requirement_met": days_requirement_met,
         "hours_requirement_met": hours_requirement_met,
         "average_requirement_met": average_requirement_met,
